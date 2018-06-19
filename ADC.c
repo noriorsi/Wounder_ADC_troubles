@@ -1,0 +1,627 @@
+
+#include "ADC.h"
+
+
+/**************************************************
+ *  Initializes the ADC module
+**************************************************/
+int16_t sampleBuffer[N_SAMPLES];
+uint32_t samples[NUM_SAMPLES];
+volatile bool adcFinished = true;
+volatile uint32_t sampleValue;//16?
+volatile uint32_t sampleCount;
+/* Buffer for ADC single and scan conversion */
+uint32_t adcBuffer[ADC_BUFFER_SIZE];
+
+int i;
+
+
+
+
+void InitADC(){
+	CMU_ClockEnable(cmuClock_HFPER, true);
+	CMU_HFRCOBandSet(cmuHFRCOBand_11MHz);
+	CMU_ClockEnable(cmuClock_ADC0, true);
+	CMU_ClockEnable(cmuClock_DMA, true);
+	rtcSetup();
+	ADC_Init_TypeDef init = ADC_INIT_DEFAULT;
+//	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
+	init.ovsRateSel = adcOvsRateSel2;
+	init.lpfMode = adcLPFilterBypass;
+	init.warmUpMode = adcWarmupNormal;
+	init.timebase = ADC_TimebaseCalc(0);
+	init.prescale = ADC_PrescaleCalc(7000000, 0);
+	init.tailgate = 0;
+	ADC_Calibration(ADC0,adcRefVDD);
+	//adcScanDma();
+	ADC_Init(ADC0, &init);
+	adcDmaSetup();
+
+
+}
+void ADC0_IRQHandler(void)
+{
+	/* Clear ADC0 interrupt flag */
+	  ADC_IntClear(ADC0, ADC_IFC_SINGLE);
+
+	  /* Read conversion result to clear Single Data Valid flag */
+	  sampleValue = ADC_DataSingleGet(ADC0);
+}
+
+void RTC_IRQHandler_ADC(void)
+{
+  /* Start ADC conversion as soon as RTC wake up. */
+  ADC_Start(ADC0, adcStartSingle);
+
+  /* Clear the interrupt flag */
+  RTC_IntClear(RTC_IFC_COMP0);
+
+  /* Wait while conversion is active */
+  while (ADC0->STATUS & ADC_STATUS_SINGLEACT)
+    ;
+
+  /* Get ADC result */
+  sampleBuffer[sampleCount++] = ADC_DataSingleGet(ADC0);
+
+  if(sampleCount == N_SAMPLES)
+  {
+    adcFinished = true;
+  }
+}
+void rtcSetup(void)
+{
+  RTC_Init_TypeDef init = RTC_INIT_DEFAULT;
+
+  /* LE and LFRCO clocks are enabled at LCD initialization */
+  /* Enable clock to RTC module */
+  CMU_ClockEnable(cmuClock_RTC, true);
+
+  init.enable   = false;
+  RTC_Init(&init);
+
+  RTC_CompareSet(0, RTC_WAKEUP_COUNT);
+}
+void adcTimerPrsSetup(void)
+
+{
+  /* Use default timer settings */
+  TIMER_Init_TypeDef timerInit;
+
+  CMU_ClockEnable(cmuClock_TIMER0, true);
+
+  /* Change prescaler to 64, gives roughly 3 overflows per
+   * second at 11MHz with 0xffff as top value */
+  timerInit.enable = false;
+  timerInit.prescale = timerPrescale64;
+  TIMER_Init(TIMER0, &timerInit);
+}
+
+/***************************************************************************//**
+* @brief Configure DMA for ADC scan mode.
+* ITT LEHET PROBLEM PL descrCfg. mindennel
+*******************************************************************************/
+void adcDmaSetup(void)
+{
+  DMA_Init_TypeDef       dmaInit;
+  DMA_CfgDescr_TypeDef   descrCfg;
+  DMA_CfgChannel_TypeDef chnlCfg;
+
+  CMU_ClockEnable(cmuClock_DMA, true);
+
+  /* Configure general DMA issues */
+  dmaInit.hprot        = 0;
+  //dmaInit.controlBlock = dmaControlBlock;
+  DMA_Init(&dmaInit);
+
+  /* Configure DMA channel used */
+  chnlCfg.highPri   = false;
+  chnlCfg.enableInt = false;
+  chnlCfg.select    = DMAREQ_ADC0_SCAN;
+  chnlCfg.cb        = NULL;
+  DMA_CfgChannel(ADC_DMA_CHANNEL, &chnlCfg);
+
+  descrCfg.dstInc  = dmaDataInc4;  /**< Increment address 4 bytes. for 2 bytes -> dmaDataInc2 */
+  descrCfg.srcInc  = dmaDataIncNone;
+  descrCfg.size    = dmaDataSize4;//????????????4 VAGY 2 VAGY WHAT
+  descrCfg.arbRate = dmaArbitrate1;/**< Arbitrate after 1 DMA transfer. It can be 2, 4....*/
+  descrCfg.hprot   = 0;
+  DMA_CfgDescr(ADC_DMA_CHANNEL, true, &descrCfg);
+}
+
+
+/***************************************************************************//**
+ * @brief
+ *   Calibrate offset and gain for the specified reference.
+ *   Supports currently only single ended gain calibration.
+ *   Could easily be expanded to support differential gain calibration.
+ *
+ * @details
+ *   The offset calibration routine measures 0 V with the ADC, and adjust
+ *   the calibration register until the converted value equals 0.
+ *   The gain calibration routine needs an external reference voltage equal
+ *   to the top value for the selected reference. For example if the 2.5 V
+ *   reference is to be calibrated, the external supply must also equal 2.5V.
+ *
+ * @param[in] adc
+ *   Pointer to ADC peripheral register block.
+ *
+ * @param[in] ref
+ *   Reference used during calibration. Can be both external and internal
+ *   references.
+ *   The SCANGAIN and SINGLEGAIN calibration fields are not used when the
+ *   unbuffered differential 2xVDD reference is selected.
+ *
+ * @return
+ *   The final value of the calibration register, note that the calibration
+ *   register gets updated with this value during the calibration.
+ *   No need to load the calibration values after the function returns.
+ ******************************************************************************/
+uint32_t ADC_Calibration(ADC_TypeDef *adc, ADC_Ref_TypeDef ref)
+{
+  int32_t  sample;
+  uint32_t cal;
+
+  /* Binary search variables */
+  uint8_t high;
+  uint8_t mid;
+  uint8_t low;
+
+  /* Reset ADC to be sure we have default settings and wait for ongoing */
+  /* conversions to be complete. */
+  ADC_Reset(adc);
+
+  ADC_Init_TypeDef       init       = ADC_INIT_DEFAULT;
+  ADC_InitSingle_TypeDef singleInit = ADC_INITSINGLE_DEFAULT;
+
+  /* Init common settings for both single conversion and scan mode */
+  init.timebase = ADC_TimebaseCalc(0);
+  init.prescale = ADC_PrescaleCalc(ADC_CLOCK, 0);
+
+  /* Set an oversampling rate for more accuracy */
+  init.ovsRateSel = adcOvsRateSel4096;
+  ADC_Init(adc, &init);
+
+  /* Init for single conversion use, measure DIFF0 with selected reference. */
+  singleInit.reference = ref;
+  singleInit.input     = adcSingleInputDiff0;
+  singleInit.acqTime   = adcAcqTime16;
+  singleInit.diff      = true;
+  /* Enable oversampling rate */
+  singleInit.resolution = adcResOVS;
+
+  ADC_InitSingle(adc, &singleInit);
+
+  /* ADC is now set up for offset calibration */
+  /* Offset calibration register is a 7 bit signed 2's complement value. */
+  /* Use unsigned indexes for binary search, and convert when calibration */
+  /* register is written to. */
+  high = 128;// maybe I need 8 bit  ? 256
+  low  = 0;
+
+  /* Do binary search for offset calibration*/
+  while (low < high)
+  {
+    /* Calculate midpoint */
+    mid = low + (high - low) / 2;
+
+    /* Midpoint is converted to 2's complement and written to both scan and */
+    /* single calibration registers */
+    cal      = adc->CAL & ~(_ADC_CAL_SINGLEOFFSET_MASK | _ADC_CAL_SCANOFFSET_MASK);
+    cal     |= (uint8_t)(mid - 63) << _ADC_CAL_SINGLEOFFSET_SHIFT;
+    cal     |= (uint8_t)(mid - 63) << _ADC_CAL_SCANOFFSET_SHIFT;
+    adc->CAL = cal;
+
+    /* Do a conversion */
+    ADC_Start(adc, adcStartSingle);
+    while (adc->STATUS & ADC_STATUS_SINGLEACT)
+      ;
+
+    /* Get ADC result */
+    sample = ADC_DataSingleGet(adc);
+
+    /* Check result and decide in which part of to repeat search */
+    /* Calibration register has negative effect on result */
+    if (sample < 0)
+    {
+      /* Repeat search in bottom half. */
+      high = mid;
+    }
+    else if (sample > 0)
+    {
+      /* Repeat search in top half. */
+      low = mid + 1;
+    }
+    else
+    {
+      /* Found it, exit while loop */
+      break;
+    }
+  }
+
+  /* Now do gain calibration, only INPUT and DIFF settings needs to be changed */
+  adc->SINGLECTRL &= ~(_ADC_SINGLECTRL_INPUTSEL_MASK | _ADC_SINGLECTRL_DIFF_MASK);
+  adc->SINGLECTRL |= (adcSingleInputCh4 << _ADC_SINGLECTRL_INPUTSEL_SHIFT);
+  adc->SINGLECTRL |= (false << _ADC_SINGLECTRL_DIFF_SHIFT);
+
+  /* Gain calibration register is a 7 bit unsigned value. */
+  high = 128;
+  low  = 0;
+
+  /* Do binary search for gain calibration */
+  while (low < high)
+  {
+    /* Calculate midpoint and write to calibration register */
+    mid = low + (high - low) / 2;
+    cal      = adc->CAL & ~(_ADC_CAL_SINGLEGAIN_MASK | _ADC_CAL_SCANGAIN_MASK);
+    cal     |= mid << _ADC_CAL_SINGLEGAIN_SHIFT;
+    cal     |= mid << _ADC_CAL_SCANGAIN_SHIFT;
+    adc->CAL = cal;
+
+    /* Do a conversion */
+    ADC_Start(adc, adcStartSingle);
+    while (adc->STATUS & ADC_STATUS_SINGLEACT)
+      ;
+
+    /* Get ADC result */
+    sample = ADC_DataSingleGet(adc);
+
+    /* Check result and decide in which part to repeat search */
+    /* Compare with a value atleast one LSB's less than top to avoid overshooting */
+    /* Since oversampling is used, the result is 16 bits, but a couple of lsb's */
+    /* applies to the 12 bit result value, if 0xffd is the top value in 12 bit, this */
+    /* is in turn 0xffd0 in the 16 bit result. */
+    /* Calibration register has positive effect on result */
+    if (sample > ADC_GAIN_CAL_VALUE)
+    {
+      /* Repeat search in bottom half. */
+      high = mid;
+    }
+    else if (sample < ADC_GAIN_CAL_VALUE)
+    {
+      /* Repeat search in top half. */
+      low = mid + 1;
+    }
+    else
+    {
+      /* Found it, exit while loop */
+      break;
+    }
+  }
+  return adc->CAL;
+}
+
+
+
+void adcReset(void)
+{
+  /* Rest ADC registers */
+  ADC_Reset(ADC0);
+  NVIC_DisableIRQ(ADC0_IRQn);
+
+  /* Disable clocks */
+  CMU_ClockEnable(cmuClock_DMA, false);
+  CMU_ClockEnable(cmuClock_PRS, false);
+  CMU_ClockEnable(cmuClock_TIMER0, false);
+
+  /* Enable key interrupt, for INT and WFE example */
+  //runKey = false;
+  //menuKey = false;
+  CMU_ClockEnable(cmuClock_GPIO, true);
+  GPIO->IFC = _GPIO_IFC_MASK;
+  NVIC_ClearPendingIRQ(GPIO_EVEN_IRQn);
+  NVIC_EnableIRQ(GPIO_EVEN_IRQn);
+  NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
+  NVIC_EnableIRQ(GPIO_ODD_IRQn);
+}
+
+
+
+/***************************************************************************//**
+* @brief Configure ADC for scan mode, using DMA to fetch ADC data.
+*******************************************************************************/
+uint32_t adcScanDma(unsigned channel)
+{
+
+	 ADC_Init_TypeDef     init     = ADC_INIT_DEFAULT;
+		  ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
+		  adcDmaSetup();
+
+		  /* Init common issues for both single conversion and scan mode */
+		  init.timebase = ADC_TimebaseCalc(0);
+		  init.prescale = ADC_PrescaleCalc(7000000, 0);
+		  ADC_Init(ADC0, &init);
+
+
+
+		  /* Init for scan mode. */
+		  scanInit.reference = adcRefVDD;
+			scanInit.input     = ADC_SCANCTRL_INPUTMASK_CH4 |
+								ADC_SCANCTRL_INPUTMASK_CH5 |
+								ADC_SCANCTRL_INPUTMASK_CH6 |
+								ADC_SCANCTRL_INPUTMASK_CH7 |
+			                    ADC_SCANCTRL_INPUTMASK_CH0 ;
+		  ADC_InitScan(ADC0, &scanInit);
+
+  DMA_ActivateBasic(DMA_CHANNEL,
+                    true,
+                    false,
+					samples,
+                    (void *)((uint32_t)&(ADC0->SCANDATA)),
+                    (NUM_SAMPLES - 1));
+
+  /* Start Scan */
+  ADC_Start(ADC0, adcStartScan);
+
+  /* Poll for scan comversion complete */
+
+  sampleBuffer[0] = (sampleBuffer[0] * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
+  sampleBuffer[1] = (sampleBuffer[1] * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
+  sampleBuffer[2] = (sampleBuffer[2] * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
+  sampleBuffer[3] = (sampleBuffer[3] * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
+  sampleBuffer[4] = (sampleBuffer[4] * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
+
+  while (ADC0->STATUS & ADC_STATUS_SCANACT)
+     ;
+
+  return sampleBuffer[channel];
+  }
+
+
+  // SegmentLCD_Number(sampleBuffer[2]);
+ // SegmentLCD_LowerNumber((sampleBuffer[0] * 10000) + sampleBuffer[1]);
+ // adcReset();
+
+
+/***************************************************************************//**
+* @brief Configure ADC for differential single conversion.
+*******************************************************************************/
+/***************************************************************************//**
+* @brief Configure ADC for TIMER PRS trigger.
+*******************************************************************************/
+
+
+
+void adcTImerPrs(void)
+{
+  ADC_Init_TypeDef       init       = ADC_INIT_DEFAULT;
+  ADC_InitSingle_TypeDef singleInit = ADC_INITSINGLE_DEFAULT;
+
+  adcTimerPrsSetup();
+
+  /* Init common settings for both single conversion and scan mode */
+  init.timebase = ADC_TimebaseCalc(0);
+  init.prescale = ADC_PrescaleCalc(ADC_CLOCK, 0);
+  ADC_Init(ADC0, &init);
+
+  /* Init for single conversion. */
+  singleInit.input = adcSingleInputCh3;
+  singleInit.reference  = adcRefVDD;
+  /* Enable PRS for ADC */
+  singleInit.prsEnable  = true;
+  ADC_InitSingle(ADC0, &singleInit);
+
+  /* Select TIMER0 as source and TIMER0OF (Timer0 overflow) as signal (rising edge) */
+  CMU_ClockEnable(cmuClock_PRS, true);
+  PRS_SourceSignalSet(ADC_FORCE0, PRS_CH_CTRL_SOURCESEL_TIMER0, PRS_CH_CTRL_SIGSEL_TIMER0OF, prsEdgePos);
+
+  /* Enable ADC Interrupt when Single Conversion Complete */
+  ADC_IntEnable(ADC0, ADC_IEN_SINGLE);
+
+  /* Enable ADC interrupt vector in NVIC*/
+  NVIC_ClearPendingIRQ(ADC0_IRQn);
+  NVIC_EnableIRQ(ADC0_IRQn);
+
+  adcFinished = false;
+  sampleValue = ILLEGAL_VALUE;
+
+
+  TIMER_Enable(TIMER0, true);
+
+  /* Exit if PB0 is pressed */
+  while (!adcFinished)
+  {
+    /* Enter EM1 and wait for timer triggered ADC conversion */
+    //EMU_EnterEM1();
+    if (sampleValue != ILLEGAL_VALUE)
+    {
+      /* Write result to LCD */
+      sampleValue = (sampleValue * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
+     // SegmentLCD_Number(sampleValue);
+      sampleValue = ILLEGAL_VALUE;
+    }
+  }
+
+  /* Stop TIMER0 */
+  TIMER_Enable(TIMER0, false);
+ // LCD_NUMBER_OFF();
+ //SegmentLCD_Write("PRS");
+  adcReset();
+}
+
+
+
+/**************************************************
+ *  Makes an ADC scan on CH4 = PD4 and returns the value,
+ *  CH5 = PD5
+ *  CH6 = PD6
+ *  CH7 = PD7
+ *  CH0 = PE12
+**************************************************/
+// the analog reading from the FSR resistors divider
+
+// I invite them in Modes.c
+
+uint32_t GetADCvalue_Force(unsigned channel) {
+	//CMU_ClockEnable(cmuClock_ADC0, true);
+	uint32_t sample;
+
+	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
+	scanInit.reference = adcRefVDD;
+
+	//ADC_InitScan(ADC0, &scanInit);
+	// Enable SCAN interrupt
+	//ADC_IntEnable(ADC0, ADC_IEN_SCAN);
+
+	uint32_t input_channel_mask;
+
+	ADC_Start(ADC0, adcStartScan);
+	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
+	switch(channel){
+	case ADC_FORCE0: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH4;
+		sample = ADC_DataScanGet(ADC0);
+		adcReset();
+		break;
+	case ADC_FORCE1: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH5;
+	sample = ADC_DataScanGet(ADC0);
+	adcReset();
+		break;
+	case ADC_FORCE2: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH6;
+	sample = ADC_DataScanGet(ADC0);
+	adcReset();
+		break;
+	case ADC_FORCE3:input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH7;
+	sample = ADC_DataScanGet(ADC0);
+	adcReset();
+		break;
+	case ADC_FORCE4: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH0;
+	sample = ADC_DataScanGet(ADC0);
+	adcReset();
+		break;
+	default:
+		input_channel_mask = ADC_SCANCTRL_INPUTMASK_DEFAULT; break;
+
+	}
+
+	scanInit.input     = input_channel_mask;
+	ADC_InitScan(ADC0, &scanInit);
+	ADC_Start(ADC0, adcStartScan);
+//scandv
+
+	//NVIC_EnableIRQ(ADC0_IRQn);
+	return sample;
+
+}
+
+
+uint32_t GetADCvalue_Force0(void) {
+
+	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
+	scanInit.reference = adcRefVDD;
+
+	scanInit.input     = ADC_SCANCTRL_INPUTMASK_CH4;
+	ADC_InitScan(ADC0, &scanInit);
+	ADC_Start(ADC0, adcStartScan);
+
+	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
+	return ADC_DataScanGet(ADC0);
+
+}
+/*
+
+uint32_t GetADCvalue_Force1(void) {
+
+	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
+	scanInit.reference = adcRefVDD;
+	scanInit.input     = ADC_SCANCTRL_INPUTMASK_CH5;
+	ADC_InitScan(ADC0, &scanInit);
+	ADC_Start(ADC0, adcStartScan);
+
+	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
+	return ADC_DataScanGet(ADC0);
+
+}
+
+uint32_t GetADCvalue_Force2(void) {
+
+	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
+	scanInit.reference = adcRefVDD;
+	scanInit.input     = ADC_SCANCTRL_INPUTMASK_CH6;
+	ADC_InitScan(ADC0, &scanInit);
+	ADC_Start(ADC0, adcStartScan);
+
+	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
+	//Get ADC result (FSR adc result)
+	return ADC_DataScanGet(ADC0);
+
+}
+
+uint32_t GetADCvalue_Force3(void) {
+
+	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
+	scanInit.reference = adcRefVDD;
+	scanInit.input     = ADC_SCANCTRL_INPUTMASK_CH7;
+	ADC_InitScan(ADC0, &scanInit);
+	ADC_Start(ADC0, adcStartScan);
+
+	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
+	//Get ADC result (FSR adc result)
+	return ADC_DataScanGet(ADC0);
+
+}
+
+uint32_t GetADCvalue_Force4(void) {
+
+	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
+	scanInit.reference = adcRefVDD;
+	scanInit.input     = ADC_SCANCTRL_INPUTMASK_CH0;
+	ADC_InitScan(ADC0, &scanInit);
+	ADC_Start(ADC0, adcStartScan);
+
+	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
+	//Get ADC result (FSR adc result)
+	return ADC_DataScanGet(ADC0);
+
+}
+*/
+/**********************************************************************/
+
+
+// the analog reading converted to voltage - not used jet
+/*
+double ADC_to_Voltage_forBattery(uint32_t ADCvalue){
+	//Calculate with the voltage divider resistors
+	return (ADCvalue / ADC_MAX_VALUE * VMCU * (RESISTOR1+RESISTOR2)/RESISTOR2);
+}*/
+
+double ADC_to_Voltage(uint32_t ADCvalue){
+	//Calculate with the voltage divider resistors
+	return (ADCvalue / ADC_MAX_VALUE * VMCU );
+}
+
+double Voltage_to_force(double volt){
+	volt *= 1000.0;			 // now its in mV
+	double fsrResistance;	 //ohm
+	double fsrConductance;
+	double fsrForce;		 // Newton
+	double vmcu = 3300.0;	 // now its in mV
+	fsrResistance = vmcu - volt;
+	fsrResistance *= 10000.0;// 10K resistor in ohm
+	fsrResistance /= volt;
+	fsrConductance = 1000000.0;
+	fsrConductance /= fsrResistance;
+
+		if (fsrConductance<=1000.0){
+					fsrForce = fsrConductance/80.0; //first figure from datasheet
+				}else{
+					fsrForce = fsrConductance - 1000.0;
+					fsrForce /= 30.0; 				//second figure from datasheet
+				}
+		return fsrForce;
+}
+
+
+/*double BatteryVoltageMeasurement(){
+	SetGPIO(BAT_MEAS_EN_PORT, BAT_MEAS_EN_PIN, 1);
+	uint32_t adc_temp = GetADCvalue();
+	SetGPIO(BAT_MEAS_EN_PORT, BAT_MEAS_EN_PIN, 0);
+
+	return ADC_to_Voltage(adc_temp);
+}*/
+
+/**************************************************
+ *  Truncates the 32 bit unsigned to a 16 bit unsigned
+**************************************************/
+/*
+uint16_t Convert32to16bit(uint32_t source){
+	return (source>>16);
+}*/
