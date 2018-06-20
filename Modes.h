@@ -30,6 +30,7 @@ void MotionSensing();
 void PowerSavingModeNotification(unsigned mode);
 void ContinousMeasurement();
 void ContinousMeasurement_for5fsr();
+void Temporary_measurements(int n, int period);
 void Measure_multipleFSR (int n, int period);
 
 //void SendAndSaveDatasPeriod(int n, int period);

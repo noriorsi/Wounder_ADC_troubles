@@ -69,7 +69,7 @@ void InitRFduinoUART();
 
 #define BAUD 9600
 
-#define DELAY_AFTER_SENDING 100 //ms
+#define DELAY_AFTER_SENDING 10 //ms
 
 
 

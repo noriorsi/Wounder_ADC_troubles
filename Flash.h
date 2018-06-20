@@ -62,4 +62,5 @@ void UpdateLastDataInFlash();
 void EraseAllPages();
 uint32_t ReadFromFlash(uint32_t *address);
 
+
 #endif /* SRC_FLASH_H_ */

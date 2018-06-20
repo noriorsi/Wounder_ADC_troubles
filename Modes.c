@@ -9,8 +9,10 @@ unsigned data1 = 0;
 int counter = 0;
 unsigned inPowerSaving = true;
 
+
+
 int32_t ff[PARAMETRIC_MEASUREMENT_STORE_SIZE], humData[PARAMETRIC_MEASUREMENT_STORE_SIZE], tData[PARAMETRIC_MEASUREMENT_STORE_SIZE];
-int32_t f0[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f1[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f2[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f3[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f4[PARAMETRIC_MEASUREMENT_STORE_SIZE];
+//int32_t f0[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f1[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f2[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f3[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f4[PARAMETRIC_MEASUREMENT_STORE_SIZE];
 void EnterPowerSaving(){
 	SetGPIO(MCULED1_PORT, MCULED1_PIN, 0);
 	SetGPIO(MCULED2_PORT, MCULED2_PIN, 0);
@@ -42,8 +44,8 @@ void PowerSavingModeNotification(unsigned mode){
 
 void ContinousMeasurement(){
 	SetGPIO(MCULED2_PORT, MCULED2_PIN, 1);
-	InitADC();
-			uint32_t f0 = GetADCvalue_Force(0);
+	//InitADC();
+			uint32_t f0 = GetADCvalue_Force0();
 			double Volt = (ADC_to_Voltage(f0));
 			double force = (Voltage_to_force(Volt));
 
@@ -54,9 +56,9 @@ void ContinousMeasurement(){
 			//SendEmpty(n*5);
 
 			SendEmpty(5);
-			uint32_t humData;
-			int32_t tData;
-			SI7021_Measure(&humData, &tData);
+			//uint32_t humData;
+			//int32_t tData;
+			//SI7021_Measure(&humData, &tData);
 
 			send_string("Force[N]: \n");
 			send_double(force);
@@ -141,7 +143,20 @@ double hgmm(uint32_t f){
 	double hgmm = temp*91.81188;
 	return hgmm;
 }
+void Temporary_measurements(int n, int period){
+	SetGPIO(MCULED2_PORT, MCULED2_PIN, 1);
+	int32_t f0;
 
+	RFDuino_GiveIT();
+	for(int i=0;i<n;++i){
+
+		f0 = GetADCvalue_Force(0);
+
+		send_double (f0);
+		SendEmpty(5);
+	}
+	SetGPIO(MCULED2_PORT, MCULED2_PIN, 0);
+}
 void Measure_multipleFSR (int n, int period){
 
 	EraseAllPages();
@@ -149,6 +164,8 @@ void Measure_multipleFSR (int n, int period){
 	uint32_t HumData;
 	int32_t TData;
 	uint32_t time_ms;
+
+	int32_t f0;
 
 	uint32_t start_time = getTime();
 
@@ -165,26 +182,27 @@ void Measure_multipleFSR (int n, int period){
 			f3[i] = GetADCvalue_Force3();
 			f4[i] = GetADCvalue_Force4();*/
 
-			f0[i] = GetADCvalue_Force(0);
-			f1[i] = GetADCvalue_Force(1);
+			f0 = GetADCvalue_Force(0);
+
+			/*f1[i] = GetADCvalue_Force(1);
 			f2[i] = GetADCvalue_Force(2);
 			f3[i] = GetADCvalue_Force(3);
-			f4[i] = GetADCvalue_Force(4);
-			/*f0[i] = adcScanDma(0);
-			f1[i] = adcScanDma(1);
+			f4[i] = GetADCvalue_Force(4);*/
+			//f0[i] = adcScanDma(0);
+			/*f1[i] = adcScanDma(1);
 			f2[i] = adcScanDma(2);
 			f3[i] = adcScanDma(3);
 			f4[i] = adcScanDma(4);*/
 
 
 
-			SI7021_Measure(&HumData, &TData);
+			//SI7021_Measure(&HumData, &TData);
 
 
 			/*uint32_t humData = HumData;
 			uint32_t tData=TData;*/
-			humData[i]=HumData;
-			tData[i]=TData;
+			//humData[i]=HumData;
+			//tData[i]=TData;
 
 			time_ms = getTime()-start_time;
 					//BatteryVoltage = BatteryADCMeasurement();
@@ -197,59 +215,64 @@ void Measure_multipleFSR (int n, int period){
 					WriteToFlash((uint32_t)humData);
 					WriteToFlash((uint32_t)tData);
 					*/
-					WriteToFlash((uint32_t)f0[i]);
-					WriteToFlash((uint32_t)f1[i]);
+					WriteToFlash((uint32_t)f0);
+					/*WriteToFlash((uint32_t)f1[i]);
 					WriteToFlash((uint32_t)f2[i]);
 					WriteToFlash((uint32_t)f3[i]);
 					WriteToFlash((uint32_t)f4[i]);
 					WriteToFlash((uint32_t)humData[i]);
-					WriteToFlash((uint32_t)tData[i]);
+					WriteToFlash((uint32_t)tData[i]);*/
 
 					//WriteToFlash((uint32_t)time_ms);
 					//WriteToFlash((uint32_t) BatteryVoltage);
-					Delay(2);
+					//Delay(2);
 					//Delay(100);
+
 				}
+
 		  //  WriteToFlash((uint32_t)time_ms);
 			UpdateLastDataInFlash();
 
 			RFDuino_GiveIT();
-			InitRFduinoUART();
+			//InitRFduinoUART();
 			SendEmpty(5);
 
 			//send_string("------\n");
 
-		//	for(uint32_t i=FLASH_START_ADDRESS; i<(FLASH_START_ADDRESS+(4*n*4)); i+=16){
-			for(uint32_t i=FLASH_START_ADDRESS; i<(FLASH_START_ADDRESS+(7*n*4)); i+=28){
+
+		//	for(uint32_t i=FLASH_START_ADDRESS; i<(FLASH_START_ADDRESS+(7*n*4)); i+=28){
+
+			for(uint32_t i=FLASH_START_ADDRESS; i<(FLASH_START_ADDRESS+(1*n*4)); i+=4){
 				uint32_t* address;
 				uint32_t readValue;
+
 
 				//force0
 				address 	= (uint32_t*)(i);
 				readValue 	= ReadFromFlash(address);
 				//send_int(readValue);
 				//send_double(quickMeas(readValue));
-				send_double (hgmm(readValue));
+				send_double (readValue);
 
 				//force1
-				address 	= (uint32_t*)(4+i);
+				/*address 	= (uint32_t*)(4+i);
 				readValue 	= ReadFromFlash(address);
-				send_double (hgmm(readValue));
+				send_double (readValue);
 
 				//force2
 				address 	= (uint32_t*)(8+i);
 				readValue 	= ReadFromFlash(address);
-				send_double (hgmm(readValue));
+				send_double (readValue);
 
 				//force3
 				address 	= (uint32_t*)(12+i);
 				readValue 	= ReadFromFlash(address);
-				send_double (hgmm(readValue));
+				send_double (readValue);
 
 				//force4
 				address 	= (uint32_t*)(16+i);
 				readValue 	= ReadFromFlash(address);
-				send_double (hgmm(readValue));
+				send_double (readValue);
 
 				//humidity
 
@@ -262,7 +285,7 @@ void Measure_multipleFSR (int n, int period){
 
 				address 	= (uint32_t*)(24+i);
 				readValue 	= ReadFromFlash(address);
-				send_double((double)readValue/1000);
+				send_double((double)readValue/1000);*/
 
 		}
 

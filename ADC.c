@@ -32,11 +32,10 @@ void InitADC(){
 	init.timebase = ADC_TimebaseCalc(0);
 	init.prescale = ADC_PrescaleCalc(7000000, 0);
 	init.tailgate = 0;
-	ADC_Calibration(ADC0,adcRefVDD);
+	//ADC_Calibration(ADC0,adcRefVDD);
 	//adcScanDma();
 	ADC_Init(ADC0, &init);
-	adcDmaSetup();
-
+	//adcDmaSetup();
 
 }
 void ADC0_IRQHandler(void)
@@ -321,31 +320,31 @@ void adcReset(void)
 *******************************************************************************/
 uint32_t adcScanDma(unsigned channel)
 {
+	//adcReset();
+	ADC_Init_TypeDef     init     = ADC_INIT_DEFAULT;
+	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
+	adcDmaSetup();
 
-	 ADC_Init_TypeDef     init     = ADC_INIT_DEFAULT;
-		  ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
-		  adcDmaSetup();
-
-		  /* Init common issues for both single conversion and scan mode */
-		  init.timebase = ADC_TimebaseCalc(0);
-		  init.prescale = ADC_PrescaleCalc(7000000, 0);
-		  ADC_Init(ADC0, &init);
+	/* Init common issues for both single conversion and scan mode */
+	init.timebase = ADC_TimebaseCalc(0);
+	init.prescale = ADC_PrescaleCalc(ADC_CLOCK/2, 0);
+	ADC_Init(ADC0, &init);
 
 
 
 		  /* Init for scan mode. */
-		  scanInit.reference = adcRefVDD;
-			scanInit.input     = ADC_SCANCTRL_INPUTMASK_CH4 |
-								ADC_SCANCTRL_INPUTMASK_CH5 |
-								ADC_SCANCTRL_INPUTMASK_CH6 |
-								ADC_SCANCTRL_INPUTMASK_CH7 |
-			                    ADC_SCANCTRL_INPUTMASK_CH0 ;
+	scanInit.reference = adcRefVDD;
+	scanInit.input     = ADC_SCANCTRL_INPUTMASK_CH4 |
+						 ADC_SCANCTRL_INPUTMASK_CH5 |
+						 ADC_SCANCTRL_INPUTMASK_CH6 |
+						 ADC_SCANCTRL_INPUTMASK_CH7 |
+			             ADC_SCANCTRL_INPUTMASK_CH0 ;
 		  ADC_InitScan(ADC0, &scanInit);
 
   DMA_ActivateBasic(DMA_CHANNEL,
                     true,
                     false,
-					samples,
+					sampleBuffer,
                     (void *)((uint32_t)&(ADC0->SCANDATA)),
                     (NUM_SAMPLES - 1));
 
@@ -353,23 +352,19 @@ uint32_t adcScanDma(unsigned channel)
   ADC_Start(ADC0, adcStartScan);
 
   /* Poll for scan comversion complete */
-
-  sampleBuffer[0] = (sampleBuffer[0] * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
+  while (ADC0->STATUS & ADC_STATUS_SCANACT)
+      ;
+  sampleBuffer[0] = (ADC_DataScanGet(ADC0) * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
   sampleBuffer[1] = (sampleBuffer[1] * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
   sampleBuffer[2] = (sampleBuffer[2] * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
   sampleBuffer[3] = (sampleBuffer[3] * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
   sampleBuffer[4] = (sampleBuffer[4] * ADC_SE_VFS_X1000) / ADC_12BIT_MAX;
-
-  while (ADC0->STATUS & ADC_STATUS_SCANACT)
-     ;
-
+  //adcReset();
   return sampleBuffer[channel];
+
   }
 
 
-  // SegmentLCD_Number(sampleBuffer[2]);
- // SegmentLCD_LowerNumber((sampleBuffer[0] * 10000) + sampleBuffer[1]);
- // adcReset();
 
 
 /***************************************************************************//**
@@ -379,7 +374,10 @@ uint32_t adcScanDma(unsigned channel)
 * @brief Configure ADC for TIMER PRS trigger.
 *******************************************************************************/
 
-
+double ADC_to_Voltage(uint32_t ADCvalue){
+	//Calculate with the voltage divider resistors
+	return (ADCvalue / ADC_MAX_VALUE * VMCU );
+}
 
 void adcTImerPrs(void)
 {
@@ -454,38 +452,26 @@ void adcTImerPrs(void)
 uint32_t GetADCvalue_Force(unsigned channel) {
 	//CMU_ClockEnable(cmuClock_ADC0, true);
 	uint32_t sample;
-
+adcReset();
 	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
 	scanInit.reference = adcRefVDD;
-
-	//ADC_InitScan(ADC0, &scanInit);
-	// Enable SCAN interrupt
-	//ADC_IntEnable(ADC0, ADC_IEN_SCAN);
-
 	uint32_t input_channel_mask;
-
-	ADC_Start(ADC0, adcStartScan);
 	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
 	switch(channel){
 	case ADC_FORCE0: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH4;
 		sample = ADC_DataScanGet(ADC0);
-		adcReset();
 		break;
 	case ADC_FORCE1: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH5;
 	sample = ADC_DataScanGet(ADC0);
-	adcReset();
 		break;
 	case ADC_FORCE2: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH6;
 	sample = ADC_DataScanGet(ADC0);
-	adcReset();
 		break;
 	case ADC_FORCE3:input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH7;
 	sample = ADC_DataScanGet(ADC0);
-	adcReset();
 		break;
 	case ADC_FORCE4: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH0;
 	sample = ADC_DataScanGet(ADC0);
-	adcReset();
 		break;
 	default:
 		input_channel_mask = ADC_SCANCTRL_INPUTMASK_DEFAULT; break;
@@ -495,9 +481,8 @@ uint32_t GetADCvalue_Force(unsigned channel) {
 	scanInit.input     = input_channel_mask;
 	ADC_InitScan(ADC0, &scanInit);
 	ADC_Start(ADC0, adcStartScan);
-//scandv
 
-	//NVIC_EnableIRQ(ADC0_IRQn);
+	//ADC_Calibration(ADC0,adcRefVDD);
 	return sample;
 
 }
@@ -506,14 +491,13 @@ uint32_t GetADCvalue_Force(unsigned channel) {
 uint32_t GetADCvalue_Force0(void) {
 
 	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
-	scanInit.reference = adcRefVDD;
+		scanInit.reference = adcRefVDD;
+		scanInit.input     = ADC_SCANCTRL_INPUTMASK_CH4;
+		ADC_InitScan(ADC0, &scanInit);
+		ADC_Start(ADC0, adcStartScan);
 
-	scanInit.input     = ADC_SCANCTRL_INPUTMASK_CH4;
-	ADC_InitScan(ADC0, &scanInit);
-	ADC_Start(ADC0, adcStartScan);
-
-	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
-	return ADC_DataScanGet(ADC0);
+		while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
+		return ADC_DataScanGet(ADC0);
 
 }
 /*
@@ -582,11 +566,11 @@ double ADC_to_Voltage_forBattery(uint32_t ADCvalue){
 	//Calculate with the voltage divider resistors
 	return (ADCvalue / ADC_MAX_VALUE * VMCU * (RESISTOR1+RESISTOR2)/RESISTOR2);
 }*/
+/*******************************************************************************
+*******************CALCULATIONS************************************************
+ * *****************************************************************************
+ */
 
-double ADC_to_Voltage(uint32_t ADCvalue){
-	//Calculate with the voltage divider resistors
-	return (ADCvalue / ADC_MAX_VALUE * VMCU );
-}
 
 double Voltage_to_force(double volt){
 	volt *= 1000.0;			 // now its in mV

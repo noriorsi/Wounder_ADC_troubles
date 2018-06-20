@@ -52,8 +52,8 @@ state_enum No_Event_Handler(void){
 										//ContinousMeasurement_for5fsr();
 
 										//send_int(entered_parametric_timestamp.seconds);
-										//Measure(param_num_number, param_period_number); 				//measure and send
-										Measure_multipleFSR(param_num_number, param_period_number);
+										Temporary_measurements(param_num_number, param_period_number); 				//measure and send
+										//Measure_multipleFSR(param_num_number, param_period_number);
 										GPIO_IntClear(RX_PIN_INT_MASK);									//enable RFDuino IT or else we won't be able to stop this state
 										GPIO_IntEnable(RX_PIN_INT_MASK);
 										EnterEM3();
