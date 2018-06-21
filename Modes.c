@@ -9,7 +9,7 @@ unsigned data1 = 0;
 int counter = 0;
 unsigned inPowerSaving = true;
 
-
+double  OFFSET;
 
 int32_t ff[PARAMETRIC_MEASUREMENT_STORE_SIZE], humData[PARAMETRIC_MEASUREMENT_STORE_SIZE], tData[PARAMETRIC_MEASUREMENT_STORE_SIZE];
 //int32_t f0[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f1[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f2[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f3[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f4[PARAMETRIC_MEASUREMENT_STORE_SIZE];
@@ -146,17 +146,37 @@ double hgmm(uint32_t f){
 void Temporary_measurements(int n, int period){
 	SetGPIO(MCULED2_PORT, MCULED2_PIN, 1);
 	int32_t f0;
-
+	int count = 0;
+	int sum = 0;
+	int32_t f0_minus_offset = 0;
 	RFDuino_GiveIT();
 	for(int i=0;i<n;++i){
 
 		f0 = GetADCvalue_Force(0);
-
-		send_double (f0);
-		SendEmpty(5);
+		/****************************************/
+		// this is only for offset calculation
+			if( f0 < 12.000){
+				count++;
+				sum += f0;
+			}
+			else{
+				sum += 0;
 	}
+		OFFSET = sum / count;
+		if (f0>OFFSET)
+		f0_minus_offset = f0-OFFSET;
+
+		/***************************************/
+    send_double (ADC_to_Voltage(f0_minus_offset));
+	}
+	SendEmpty(5);
+	send_string ("AVERAGE OFFSET: \n");
+	send_double (ADC_to_Voltage(OFFSET));
+	SendEmpty(5);
 	SetGPIO(MCULED2_PORT, MCULED2_PIN, 0);
 }
+
+
 void Measure_multipleFSR (int n, int period){
 
 	EraseAllPages();

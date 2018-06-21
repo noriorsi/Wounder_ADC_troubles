@@ -7,6 +7,7 @@
 **************************************************/
 int16_t sampleBuffer[N_SAMPLES];
 uint32_t samples[NUM_SAMPLES];
+
 volatile bool adcFinished = true;
 volatile uint32_t sampleValue;//16?
 volatile uint32_t sampleCount;
@@ -564,7 +565,7 @@ uint32_t GetADCvalue_Force4(void) {
 /*
 double ADC_to_Voltage_forBattery(uint32_t ADCvalue){
 	//Calculate with the voltage divider resistors
-	return (ADCvalue / ADC_MAX_VALUE * VMCU * (RESISTOR1+RESISTOR2)/RESISTOR2);
+	return ((ADCvalue / ADC_MAX_VALUE * VMCU * (RESISTOR1+RESISTOR2)/RESISTOR2);
 }*/
 /*******************************************************************************
 *******************CALCULATIONS************************************************

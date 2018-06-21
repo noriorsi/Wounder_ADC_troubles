@@ -14,11 +14,13 @@
 #include "em_timer.h"
 #include "em_prs.h"
 #include "rtc.h"
+#include "commands.h"
 
 #define DMA_CHANNEL    0
 #define NUM_SAMPLES    5
 #define LFRCOFREQ 32768
 #define ADC_BUFFER_SIZE	64
+
 /* Change this to increase or decrease sampling frequency. */
 #define WAKEUP_US 1000
 /* Change this to increase or decrease number of samples. */
