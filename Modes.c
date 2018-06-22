@@ -20,26 +20,6 @@ void EnterPowerSaving(){
 	EnterEM3();;
 }
 
-void PowerSavingModeNotification(unsigned mode){
-	if(inPowerSaving && (mode != MODE0)){
-		SendEmpty(100);
-		for(int i=0; i<1; ++i){
-			send_string("Leaving EM3 power saving.\n");
-		}
-		SendEmpty(100);
-		inPowerSaving = false;
-	}
-
-	if(!inPowerSaving && mode == MODE0){
-		SendEmpty(100);
-		for(int i=0; i<1; ++i){
-			send_string("Entering EM3 power saving.\n");
-		}
-		SendEmpty(100);
-		inPowerSaving = true;
-	}
-}
-
 
 
 void ContinousMeasurement(){
@@ -134,18 +114,25 @@ double forceNewton(uint32_t f){
 
 double forceing(uint32_t f){
 	double temp = forceNewton(f);
-	temp = temp * 101.972;
+	temp = temp * 101.972;// change in N and g
 	return temp;
 }
 //finally the FSR measurement in Hgmm
-double hgmm(uint32_t f){
+// for active area 14,68mm -> 1,468 cm
+// Area = pi*(d/4)
+// p = weight(in g ) * 0,7356 / Area
+// p = 101.972 * 0,7356 / 1,692552
+// hgmm = p * temp
+/*double hgmm(uint32_t f){
 	double temp = forceNewton(f);
-	double hgmm = temp*91.81188;
+	//double hgmm = temp*91.81188;
+	double hgmm = temp * 44.3180494307;
 	return hgmm;
-}
+}*/
 void Temporary_measurements(int n, int period){
 	SetGPIO(MCULED2_PORT, MCULED2_PIN, 1);
 	int32_t f0;
+	double volt = 0;
 	int count = 0;
 	int sum = 0;
 	int32_t f0_minus_offset = 0;
@@ -167,13 +154,18 @@ void Temporary_measurements(int n, int period){
 		f0_minus_offset = f0-OFFSET;
 
 		/***************************************/
-    send_double (ADC_to_Voltage(f0_minus_offset));
+	//volt = ADC_to_Voltage(f0_minus_offset);
+	/*send_string ("HGMM: \n");
+    send_double (hgmm(volt));*/
+	 send_double (ADC_to_Voltage(f0));
 	}
 	SendEmpty(5);
 	send_string ("AVERAGE OFFSET: \n");
 	send_double (ADC_to_Voltage(OFFSET));
+	send_string ("-----------------------");
 	SendEmpty(5);
 	SetGPIO(MCULED2_PORT, MCULED2_PIN, 0);
+
 }
 
 

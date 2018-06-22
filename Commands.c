@@ -18,7 +18,7 @@ int param_num_number = 50;
 char PARAM[NUMBER_OF_PARAMS];
 unsigned set_params[NUMBER_OF_PARAMS] = {false};
 
-
+/*
 static int isNum(char ch){
   int temp = ch - '0';
   if(temp<0 || temp>9) return false;
@@ -86,7 +86,7 @@ static int paramIndex(char ch){
 
 
 
-
+*/
 
 /***************************************************
 Initializes the command strings
@@ -96,7 +96,7 @@ void InitCMD(){
    CMD[CMD_STOP] 		= 	"$STOP$";
    CMD[CMD_SLEEP]	 	=   "$SLEEP$";
    CMD[CMD_STARTM2]		=	"$STARTM2$";
-   InitPARAM();
+   //InitPARAM();
 
 }
 
@@ -140,7 +140,7 @@ void ExecuteCommand(int cmd){
 }
 
 
-
+/*
 
 void SaveParam(char* data, int n){
   if(data[0] == PARAM_CHAR){
@@ -213,4 +213,4 @@ void ResetParams(){
   param_num_number = 0;
 
 }
-
+*/

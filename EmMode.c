@@ -14,10 +14,10 @@ static void disableHFClocks(void)
 {
  // Disable High Frequency Peripheral Clocks
   CMU_ClockEnable(cmuClock_HFPER, false);
-#if defined( CMU_HFPERCLKEN0_USART0 )
-  CMU_ClockEnable(cmuClock_USART0, false);
-#endif
+#if defined( CMU_HFPERCLKEN0_USART1 )
   CMU_ClockEnable(cmuClock_USART1, false);
+#endif
+  CMU_ClockEnable(cmuClock_USART0, false);
   CMU_ClockEnable(cmuClock_TIMER0, false);
   CMU_ClockEnable(cmuClock_TIMER1, false);
 #if defined( CMU_HFPERCLKEN0_TIMER2 )
@@ -318,9 +318,6 @@ void EnterEM3(void)
   // Enter EM3.
   EMU_EnterEM3(false);
 }
-void EnterEM2(void){
-	EMU_EnterEM2(false);
-}
 
 /***************************************************************************//**
  * @brief
@@ -345,6 +342,9 @@ void EnterEM4(void)
 	SendEmpty(100);
 	send_RFDuino_command(CMD[CMD_SLEEP]);
 	SendEmpty(100);
+
+
+
 
 
   // High and low frequency clocks are disabled in EM4.

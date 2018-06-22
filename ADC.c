@@ -19,6 +19,7 @@ int i;
 
 
 
+
 void InitADC(){
 	CMU_ClockEnable(cmuClock_HFPER, true);
 	CMU_HFRCOBandSet(cmuHFRCOBand_11MHz);

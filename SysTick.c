@@ -5,7 +5,6 @@
  *      Author: Miklós
  */
 
-
 #include "SysTick.h"
 
 /* Counts 1ms timeTicks */

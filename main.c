@@ -33,11 +33,13 @@ int main(void)
   InitRFduinoUART();
   EnterPowerSaving();
 
-
+  SetGPIO(MCULED1_PORT,MCULED1_PIN,1);
+  Delay (1000);
+  SetGPIO(MCULED1_PORT,MCULED1_PIN,0);
   /* Infinite loop */
   while (1) {
 
-	 //SetGPIO(MCULED1_PORT,MCULED1_PIN,1);
+
 	 //SetGPIO(MCULED3_PORT,MCULED3_PIN,1);
 
 	   TimeoutChecker();
