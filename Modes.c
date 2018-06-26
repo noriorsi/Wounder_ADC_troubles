@@ -22,47 +22,6 @@ void EnterPowerSaving(){
 
 
 
-void ContinousMeasurement(){
-	SetGPIO(MCULED2_PORT, MCULED2_PIN, 1);
-	//InitADC();
-			uint32_t f0 = GetADCvalue_Force0();
-			double Volt = (ADC_to_Voltage(f0));
-			double force = (Voltage_to_force(Volt));
-
-			double hgmm = 133.3222365 * force;
-			hgmm = hgmm / 38.0;
-
-			InitRFDuino();
-			//SendEmpty(n*5);
-
-			SendEmpty(5);
-			//uint32_t humData;
-			//int32_t tData;
-			//SI7021_Measure(&humData, &tData);
-
-			send_string("Force[N]: \n");
-			send_double(force);
-			send_string("F[Hgmm]: \n");
-			send_double(hgmm);
-			//send_string("T[°C]: \n");
-			//send_double(tData/1000.0);
-			//send_string("H[%]: \n");
-			//send_double(humData/1000.0);
-			//send_string("---------------------\n");
-			send_string("Voltage: \n");
-			send_double(Volt);
-			//send_string("---------------------\n");
-
-			//send_string("Date\n:");
-			//SendDate();
-			send_string("---------------------\n");
-			RFDuino_GiveIT();
-			InitRFduinoUART();
-
-//			send_int(ReadFromFlash((uint32_t*)ADDRESS_OF_LAST_DATA_ADDRESS));
-			SendEmpty(5);
-			SetGPIO(MCULED2_PORT, MCULED2_PIN, 0);
-}
 
 
 void ContinousMeasurement_for5fsr(){
@@ -118,26 +77,32 @@ double forceing(uint32_t f){
 	return temp;
 }
 //finally the FSR measurement in Hgmm
+// smaller active area : //double hgmm = temp*91.81188;
+// for active area : 10,2 -> 1,02 cm--> Area = 0,817
 // for active area 14,68mm -> 1,468 cm
-// Area = pi*(d/4)
-// p = weight(in g ) * 0,7356 / Area
-// p = 101.972 * 0,7356 / 1,692552
+// Area = pi*(d*d/4)
+// p = weight(in g ) * 0.7356 / Area
+// p = 101.972 * 0.7356 / 1,692552
 // hgmm = p * temp
-/*double hgmm(uint32_t f){
+double hgmm(uint32_t f){
 	double temp = forceNewton(f);
-	//double hgmm = temp*91.81188;
-	double hgmm = temp * 44.3180494307;
+
+	//double hgmm = temp * 44.31805;
+	double hgmm = temp * 91.8;
 	return hgmm;
-}*/
+}
+double volt = 0;
+int count = 0;
+int sum;
 void Temporary_measurements(int n, int period){
 	SetGPIO(MCULED2_PORT, MCULED2_PIN, 1);
-	int32_t f0;
-	double volt = 0;
-	int count = 0;
-	int sum = 0;
-	int32_t f0_minus_offset = 0;
+	int32_t f0, f1;
+
+	int32_t f0_minus_offset ;
 	RFDuino_GiveIT();
 	for(int i=0;i<n;++i){
+
+	//	f0 = GetADCvalue_Force(0);
 
 		f0 = GetADCvalue_Force(0);
 		/****************************************/
@@ -150,17 +115,24 @@ void Temporary_measurements(int n, int period){
 				sum += 0;
 	}
 		OFFSET = sum / count;
-		if (f0>OFFSET)
+		if (f0>OFFSET){
 		f0_minus_offset = f0-OFFSET;
+		}else{
+			f0_minus_offset = f0;
+		}
 
+		send_string ("[V]: \n");
+		send_double(ADC_to_Voltage(f0_minus_offset));
+		send_string ("[HGMM] : \n");
+		send_double(hgmm(f0_minus_offset));
 		/***************************************/
 	//volt = ADC_to_Voltage(f0_minus_offset);
-	/*send_string ("HGMM: \n");
-    send_double (hgmm(volt));*/
-	 send_double (ADC_to_Voltage(f0));
+	//send_string ("HGMM: \n");
+    //send_double (hgmm(volt));
+
 	}
 	SendEmpty(5);
-	send_string ("AVERAGE OFFSET: \n");
+	send_string ("Average OFFSET: \n");
 	send_double (ADC_to_Voltage(OFFSET));
 	send_string ("-----------------------");
 	SendEmpty(5);

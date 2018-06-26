@@ -453,27 +453,27 @@ void adcTImerPrs(void)
 
 uint32_t GetADCvalue_Force(unsigned channel) {
 	//CMU_ClockEnable(cmuClock_ADC0, true);
-	uint32_t sample;
-adcReset();
+uint32_t sample;
+//adcReset();
 	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
 	scanInit.reference = adcRefVDD;
 	uint32_t input_channel_mask;
-	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
+	//while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
 	switch(channel){
 	case ADC_FORCE0: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH4;
-		sample = ADC_DataScanGet(ADC0);
+	//	sample = ADC_DataScanGet(ADC0);
 		break;
 	case ADC_FORCE1: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH5;
-	sample = ADC_DataScanGet(ADC0);
+	//sample = ADC_DataScanGet(ADC0);
 		break;
 	case ADC_FORCE2: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH6;
-	sample = ADC_DataScanGet(ADC0);
+	//sample = ADC_DataScanGet(ADC0);
 		break;
 	case ADC_FORCE3:input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH7;
-	sample = ADC_DataScanGet(ADC0);
+	//sample = ADC_DataScanGet(ADC0);
 		break;
 	case ADC_FORCE4: input_channel_mask = ADC_SCANCTRL_INPUTMASK_CH0;
-	sample = ADC_DataScanGet(ADC0);
+	//sample = ADC_DataScanGet(ADC0);
 		break;
 	default:
 		input_channel_mask = ADC_SCANCTRL_INPUTMASK_DEFAULT; break;
@@ -483,13 +483,13 @@ adcReset();
 	scanInit.input     = input_channel_mask;
 	ADC_InitScan(ADC0, &scanInit);
 	ADC_Start(ADC0, adcStartScan);
-
+	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
 	//ADC_Calibration(ADC0,adcRefVDD);
-	return sample;
+	return ADC_DataScanGet(ADC0);
 
 }
 
-
+/*
 uint32_t GetADCvalue_Force0(void) {
 
 	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
