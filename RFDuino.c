@@ -98,7 +98,7 @@ static void send(char * string){
 
       while (*string != 0)
       {
-            if (*string == '\n')
+            if (*string == '\n' || *string == '\t')
             {
                   //USART_Tx(USART1, '\r');
                   buffer.data[buffer.head++] = '\r';

@@ -242,6 +242,10 @@ uint32_t ADC_Calibration(ADC_TypeDef *adc, ADC_Ref_TypeDef ref)
   /* Now do gain calibration, only INPUT and DIFF settings needs to be changed */
   adc->SINGLECTRL &= ~(_ADC_SINGLECTRL_INPUTSEL_MASK | _ADC_SINGLECTRL_DIFF_MASK);
   adc->SINGLECTRL |= (adcSingleInputCh4 << _ADC_SINGLECTRL_INPUTSEL_SHIFT);
+  adc->SINGLECTRL |= (adcSingleInputCh5 << _ADC_SINGLECTRL_INPUTSEL_SHIFT);
+  adc->SINGLECTRL |= (adcSingleInputCh6 << _ADC_SINGLECTRL_INPUTSEL_SHIFT);
+  adc->SINGLECTRL |= (adcSingleInputCh7 << _ADC_SINGLECTRL_INPUTSEL_SHIFT);
+  adc->SINGLECTRL |= (adcSingleInputCh0 << _ADC_SINGLECTRL_INPUTSEL_SHIFT);
   adc->SINGLECTRL |= (false << _ADC_SINGLECTRL_DIFF_SHIFT);
 
   /* Gain calibration register is a 7 bit unsigned value. */
@@ -484,7 +488,8 @@ uint32_t sample;
 	ADC_InitScan(ADC0, &scanInit);
 	ADC_Start(ADC0, adcStartScan);
 	while (ADC0->STATUS & ADC_STATUS_SCANACT) ;
-	//ADC_Calibration(ADC0,adcRefVDD);
+
+	ADC_Calibration(ADC0,adcRefVDD);
 	return ADC_DataScanGet(ADC0);
 
 }

@@ -9,7 +9,7 @@ unsigned data1 = 0;
 int counter = 0;
 unsigned inPowerSaving = true;
 
-double  OFFSET;
+double  OFFSET, OFFSET1;
 
 int32_t ff[PARAMETRIC_MEASUREMENT_STORE_SIZE], humData[PARAMETRIC_MEASUREMENT_STORE_SIZE], tData[PARAMETRIC_MEASUREMENT_STORE_SIZE];
 //int32_t f0[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f1[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f2[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f3[PARAMETRIC_MEASUREMENT_STORE_SIZE],  f4[PARAMETRIC_MEASUREMENT_STORE_SIZE];
@@ -93,49 +93,101 @@ double hgmm(uint32_t f){
 }
 double volt = 0;
 int count = 0;
+int t;
 int sum;
+
 void Temporary_measurements(int n, int period){
 	SetGPIO(MCULED2_PORT, MCULED2_PIN, 1);
 	int32_t f0, f1;
+	int32_t force0[n];
+	int32_t force1[n];
+	int32_t f0_minus_offset, f1_minus_offset  ;
+	uint32_t HData[n];
+	int32_t TempData[n];
 
-	int32_t f0_minus_offset ;
 	RFDuino_GiveIT();
+	send_string("\n");
+	send_string ("Collecting datas...\n\n");
+
+
 	for(int i=0;i<n;++i){
 
-	//	f0 = GetADCvalue_Force(0);
-
 		f0 = GetADCvalue_Force(0);
+		f1 = GetADCvalue_Force(1);
+		SI7021_Measure(&humData, &tData);
+
+		//force0[i]= f0;
+		//force1[i]= f1;
+
 		/****************************************/
 		// this is only for offset calculation
-			if( f0 < 12.000){
+			if( f0 < 50.000){
 				count++;
 				sum += f0;
 			}
 			else{
 				sum += 0;
-	}
+			}
+
 		OFFSET = sum / count;
+
 		if (f0>OFFSET){
 		f0_minus_offset = f0-OFFSET;
 		}else{
-			f0_minus_offset = f0;
+			f0_minus_offset = 0.000;
 		}
+		/***************************************/
+		if( f1 < 50.000){
+				count++;
+				sum += f1;
+			}
+			else{
+				sum += 0;
+			}
+		OFFSET1 = sum / count;
+		if (f1>OFFSET1){
+			f1_minus_offset = f1-OFFSET1;
+			}else{
+			f1_minus_offset = 0.000;
+			}
+		/**********************************/
 
-		send_string ("[V]: \n");
-		send_double(ADC_to_Voltage(f0_minus_offset));
-		send_string ("[HGMM] : \n");
-		send_double(hgmm(f0_minus_offset));
+		force0[i]= f0_minus_offset;
+		force1[i]= f1_minus_offset;
+		HData[i] = humData;
+		TempData[i]= tData;
+
+	}
+
+		/***************************************/
+		t = t+1;
+
+		RFDuino_GiveIT();
+		SendEmpty(5);
+
+	for(int i=1;i<n;++i){
+		send_double(force0[i]);
+		send_string ("\t");
+		//send_double(hgmm(f1_minus_offset));
+		send_double(force1[i]);
+	}
+	send_string ("\n");
+	send_string ("Avg OFFSET: \n");
+	send_double (OFFSET);
+	send_double (OFFSET1);
+	send_string ("The end \n");
+
 		/***************************************/
 	//volt = ADC_to_Voltage(f0_minus_offset);
 	//send_string ("HGMM: \n");
     //send_double (hgmm(volt));
 
-	}
+
 	SendEmpty(5);
-	send_string ("Average OFFSET: \n");
-	send_double (ADC_to_Voltage(OFFSET));
-	send_string ("-----------------------");
-	SendEmpty(5);
+	//send_string ("Avg OFFSET: \n");
+	//send_double (OFFSET);
+	//send_string ("-----------------------");
+	//SendEmpty(5);
 	SetGPIO(MCULED2_PORT, MCULED2_PIN, 0);
 
 }
