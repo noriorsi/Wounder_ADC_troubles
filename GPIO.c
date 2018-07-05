@@ -201,3 +201,22 @@ void GPIO_EVEN_IRQHandler(void)
 unsigned StartMode(){
 	return startMode;
 }
+
+
+void FlashLeds(unsigned int n){
+
+#ifdef LEDS_OFF
+	return;
+#endif
+
+	for(int i =0; i<n; ++i){
+		SetGPIO(MCULED1_PORT, MCULED1_PIN, 1);
+		SetGPIO(MCULED2_PORT, MCULED2_PIN, 1);
+		SetGPIO(MCULED3_PORT, MCULED3_PIN, 1);
+		Delay(100);
+		SetGPIO(MCULED1_PORT, MCULED1_PIN, 0);
+		SetGPIO(MCULED2_PORT, MCULED2_PIN, 0);
+		SetGPIO(MCULED3_PORT, MCULED3_PIN, 0);
+		Delay(100);
+	}
+}

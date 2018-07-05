@@ -102,19 +102,21 @@ void Temporary_measurements(int n, int period){
 	int32_t force0[n];
 	int32_t force1[n];
 	int32_t f0_minus_offset, f1_minus_offset  ;
-	uint32_t HData[n];
-	int32_t TempData[n];
+	uint32_t HumData;
+	int32_t TData;
+
 
 	RFDuino_GiveIT();
 	send_string("\n");
-	send_string ("Collecting datas...\n\n");
+	send_string ("Collecting datas...\n");
 
+	send_string("\n");
 
 	for(int i=0;i<n;++i){
 
 		f0 = GetADCvalue_Force(0);
 		f1 = GetADCvalue_Force(1);
-		SI7021_Measure(&humData, &tData);
+
 
 		//force0[i]= f0;
 		//force1[i]= f1;
@@ -151,11 +153,9 @@ void Temporary_measurements(int n, int period){
 			f1_minus_offset = 0.000;
 			}
 		/**********************************/
-
+		//SI7021_Measure(&HumData, &TData);
 		force0[i]= f0_minus_offset;
 		force1[i]= f1_minus_offset;
-		HData[i] = humData;
-		TempData[i]= tData;
 
 	}
 
@@ -166,10 +166,20 @@ void Temporary_measurements(int n, int period){
 		SendEmpty(5);
 
 	for(int i=1;i<n;++i){
+		send_string ("\n");
+		send_string ("Force0:   ");
 		send_double(force0[i]);
-		send_string ("\t");
-		//send_double(hgmm(f1_minus_offset));
+		send_string ("Force1:   ");
 		send_double(force1[i]);
+
+		SI7021_Measure(&HumData, &TData);
+		humData[i]=HumData;
+		tData[i]=TData;
+		send_string ("Humidity: ");
+		send_double((uint32_t)humData[i]);
+		send_string ("Temperature: ");
+		send_double((uint32_t)tData[i]);
+
 	}
 	send_string ("\n");
 	send_string ("Avg OFFSET: \n");

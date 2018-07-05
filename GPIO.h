@@ -151,4 +151,5 @@ void GPIO_Unified_IRQ(void);
 void GPIO_ODD_IRQHandler(void);
 void GPIO_EVEN_IRQHandler(void);
 unsigned StartMode();
+void FlashLeds(unsigned int n);
 #endif /* SRC_GPIO_H_ */

@@ -29,13 +29,13 @@ int main(void)
   InitEmulatedEEPROM();
   InitRTC();
   InitFlash();
-
+  FlashLeds(1);
   InitRFduinoUART();
   EnterPowerSaving();
 
-  SetGPIO(MCULED1_PORT,MCULED1_PIN,1);
-  Delay (1000);
-  SetGPIO(MCULED1_PORT,MCULED1_PIN,0);
+  //SetGPIO(MCULED1_PORT,MCULED1_PIN,1);
+  //Delay (1000);
+  //SetGPIO(MCULED1_PORT,MCULED1_PIN,0);
   /* Infinite loop */
   while (1) {
 
