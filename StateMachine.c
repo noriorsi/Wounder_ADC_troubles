@@ -49,7 +49,8 @@ state_enum No_Event_Handler(void){
 			//ContinousMeasurement();
 			if(didElapseGivenSeconds(delay_between_measurement, entered_parametric_timestamp)){ //we need to check this here too else every RFduino IT leads here
 										entered_parametric_timestamp = getTimeStructRTC();
-										Temporary_measurements(param_num_number, param_period_number); 				//measure and send
+										Temporary_measurements(param_num_number, param_period_number);
+
 										//Measure_multipleFSR(param_num_number, param_period_number);
 										GPIO_IntClear(RX_PIN_INT_MASK);									//enable RFDuino IT or else we won't be able to stop this state
 										GPIO_IntEnable(RX_PIN_INT_MASK);

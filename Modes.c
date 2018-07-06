@@ -176,9 +176,9 @@ void Temporary_measurements(int n, int period){
 		humData[i]=HumData;
 		tData[i]=TData;
 		send_string ("Humidity: ");
-		send_double((uint32_t)humData[i]);
+		send_double((humData[i]/1000.0));
 		send_string ("Temperature: ");
-		send_double((uint32_t)tData[i]);
+		send_double((tData[i]/1000.0));
 
 	}
 	send_string ("\n");

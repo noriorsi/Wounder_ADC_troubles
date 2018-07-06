@@ -274,7 +274,13 @@ void send_int(int data){
 			ErrorHandler(SEND_INT_BUFFER_OVERFLOW_ERROR_NUMBER);
 			return;
 		}
+#ifdef SEND_TYPE_IDENTIFIERS
 	snprintf(tempc,13, "d%d\n", data);
+#endif
+
+#ifndef SEND_TYPE_IDENTIFIERS
+	snprintf(tempc,13, "%d\n", data);
+#endif
 	send(tempc);
 }
 
@@ -296,7 +302,7 @@ void send_double(double data){
 		array[i] = fraction*10;
 		fraction = fraction*10 - array[i];
 	}
-
+#ifdef SEND_TYPE_IDENTIFIERS
 	switch(RESOLUTION){
 	case 0: snprintf(tempc,23, "f%d\n",whole); break;
 	case 1: snprintf(tempc,23, "f%d.%d\n",whole,array[0]); break;
@@ -307,7 +313,20 @@ void send_double(double data){
 	case 6: snprintf(tempc,23, "f%d.%d%d%d%d%d%d\n",whole,array[0],array[1],array[2],array[3],array[4],array[5]); break;
 	default: snprintf(tempc,23, "f%d.%d%d%d\n",whole,array[0],array[1],array[2]); break;
 	}
+#endif
 
+#ifndef SEND_TYPE_IDENTIFIERS
+		switch(RESOLUTION){
+		case 0: snprintf(tempc,23, "%d\n",whole); break;
+		case 1: snprintf(tempc,23, "%d.%d\n",whole,array[0]); break;
+		case 2: snprintf(tempc,23, "%d.%d%d\n",whole,array[0],array[1]); break;
+		case 3: snprintf(tempc,23, "%d.%d%d%d\n",whole,array[0],array[1],array[2]); break;
+		case 4: snprintf(tempc,23, "%d.%d%d%d%d\n",whole,array[0],array[1],array[2],array[3]); break;
+		case 5: snprintf(tempc,23, "%d.%d%d%d%d%d\n",whole,array[0],array[1],array[2],array[3],array[4]); break;
+		case 6: snprintf(tempc,23, "%d.%d%d%d%d%d%d\n",whole,array[0],array[1],array[2],array[3],array[4],array[5]); break;
+		default: snprintf(tempc,23, "%d.%d%d%d\n",whole,array[0],array[1],array[2]); break;
+		}
+	#endif
 	send(tempc);
 }
 
@@ -318,7 +337,15 @@ void send_double(double data){
 void send_string(char* string){
 	int n = 100;
 		char tempc[n];
-		int ret = snprintf(tempc, n, "s%s", string);
+		int ret = 0;
+
+		#ifdef SEND_TYPE_IDENTIFIERS
+			ret = snprintf(tempc, n, "s%s", string);
+		#endif
+
+		#ifndef SEND_TYPE_IDENTIFIERS
+			ret = snprintf(tempc, n, "%s", string);
+		#endif
 		if(ret < 0){//encoding error
 			ErrorHandler(SEND_STRING_ENCODING_ERROR_NUMBER);
 			return;
