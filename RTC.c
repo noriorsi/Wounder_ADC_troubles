@@ -177,7 +177,8 @@ void RTC_Setup(CMU_Select_TypeDef osc)
  * Handles RTC interrupts
  *************************************************************/
 void RTC_IRQHandler(){
-	time.seconds++;
+
+	time.seconds+=(RTC_IT_INTERVAL/1000);
 
 	if(time.seconds>=60){
 		time.seconds = 0;

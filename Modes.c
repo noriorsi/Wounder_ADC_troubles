@@ -167,25 +167,28 @@ void Temporary_measurements(int n, int period){
 
 	for(int i=1;i<n;++i){
 		send_string ("\n");
-		send_string ("Force0:   ");
+		send_string ("F0 = \0");
 		send_double(force0[i]);
-		send_string ("Force1:   ");
+		send_string ("F1 = ");
 		send_double(force1[i]);
 
 		SI7021_Measure(&HumData, &TData);
 		humData[i]=HumData;
 		tData[i]=TData;
-		send_string ("Humidity: ");
+		send_string ("H = \0");
 		send_double((humData[i]/1000.0));
-		send_string ("Temperature: ");
+		send_string ("T = ");
 		send_double((tData[i]/1000.0));
 
 	}
-	send_string ("\n");
-	send_string ("Avg OFFSET: \n");
+	//send_string ("\n");
+	//send_string ("Avg OFFSET: \n");
 	send_double (OFFSET);
 	send_double (OFFSET1);
-	send_string ("The end \n");
+	//send_string ("\n");
+		//send_string ("Date: \n");
+		//SendDate();
+	//send_string ("The end \n");
 
 		/***************************************/
 	//volt = ADC_to_Voltage(f0_minus_offset);

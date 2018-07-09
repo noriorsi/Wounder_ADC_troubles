@@ -18,6 +18,7 @@
 #include "GPIO.h"
 #include "StateMachine.h"
 #include "EEPROM.h"
+#include "ADC.h"
 
 
 /**************************************************
@@ -27,7 +28,7 @@
 #define 	true	1
 #define		false	0
 
-#define 	RTC_IT_INTERVAL		10000	// ms
+#define 	RTC_IT_INTERVAL		1000	// ms
 
 typedef enum{
   SECOND,

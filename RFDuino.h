@@ -77,7 +77,7 @@ void InitRFduinoUART();
 #define BUF_SIZE    64
 #define RX_SIZE     60
 
-//#define SEND_TYPE_IDENTIFIERS
+#define SEND_TYPE_IDENTIFIERS
 /**************************************************
  *  Structs
 **************************************************/

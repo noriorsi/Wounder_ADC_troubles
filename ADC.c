@@ -25,7 +25,7 @@ void InitADC(){
 	CMU_HFRCOBandSet(cmuHFRCOBand_11MHz);
 	CMU_ClockEnable(cmuClock_ADC0, true);
 	CMU_ClockEnable(cmuClock_DMA, true);
-	rtcSetup();
+
 	ADC_Init_TypeDef init = ADC_INIT_DEFAULT;
 //	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
 	init.ovsRateSel = adcOvsRateSel2;
@@ -40,94 +40,8 @@ void InitADC(){
 	//adcDmaSetup();
 
 }
-void ADC0_IRQHandler(void)
-{
-	/* Clear ADC0 interrupt flag */
-	  ADC_IntClear(ADC0, ADC_IFC_SINGLE);
 
-	  /* Read conversion result to clear Single Data Valid flag */
-	  sampleValue = ADC_DataSingleGet(ADC0);
-}
 
-void RTC_IRQHandler_ADC(void)
-{
-  /* Start ADC conversion as soon as RTC wake up. */
-  ADC_Start(ADC0, adcStartSingle);
-
-  /* Clear the interrupt flag */
-  RTC_IntClear(RTC_IFC_COMP0);
-
-  /* Wait while conversion is active */
-  while (ADC0->STATUS & ADC_STATUS_SINGLEACT)
-    ;
-
-  /* Get ADC result */
-  sampleBuffer[sampleCount++] = ADC_DataSingleGet(ADC0);
-
-  if(sampleCount == N_SAMPLES)
-  {
-    adcFinished = true;
-  }
-}
-void rtcSetup(void)
-{
-  RTC_Init_TypeDef init = RTC_INIT_DEFAULT;
-
-  /* LE and LFRCO clocks are enabled at LCD initialization */
-  /* Enable clock to RTC module */
-  CMU_ClockEnable(cmuClock_RTC, true);
-
-  init.enable   = false;
-  RTC_Init(&init);
-
-  RTC_CompareSet(0, RTC_WAKEUP_COUNT);
-}
-void adcTimerPrsSetup(void)
-
-{
-  /* Use default timer settings */
-  TIMER_Init_TypeDef timerInit;
-
-  CMU_ClockEnable(cmuClock_TIMER0, true);
-
-  /* Change prescaler to 64, gives roughly 3 overflows per
-   * second at 11MHz with 0xffff as top value */
-  timerInit.enable = false;
-  timerInit.prescale = timerPrescale64;
-  TIMER_Init(TIMER0, &timerInit);
-}
-
-/***************************************************************************//**
-* @brief Configure DMA for ADC scan mode.
-* ITT LEHET PROBLEM PL descrCfg. mindennel
-*******************************************************************************/
-void adcDmaSetup(void)
-{
-  DMA_Init_TypeDef       dmaInit;
-  DMA_CfgDescr_TypeDef   descrCfg;
-  DMA_CfgChannel_TypeDef chnlCfg;
-
-  CMU_ClockEnable(cmuClock_DMA, true);
-
-  /* Configure general DMA issues */
-  dmaInit.hprot        = 0;
-  //dmaInit.controlBlock = dmaControlBlock;
-  DMA_Init(&dmaInit);
-
-  /* Configure DMA channel used */
-  chnlCfg.highPri   = false;
-  chnlCfg.enableInt = false;
-  chnlCfg.select    = DMAREQ_ADC0_SCAN;
-  chnlCfg.cb        = NULL;
-  DMA_CfgChannel(ADC_DMA_CHANNEL, &chnlCfg);
-
-  descrCfg.dstInc  = dmaDataInc4;  /**< Increment address 4 bytes. for 2 bytes -> dmaDataInc2 */
-  descrCfg.srcInc  = dmaDataIncNone;
-  descrCfg.size    = dmaDataSize4;//????????????4 VAGY 2 VAGY WHAT
-  descrCfg.arbRate = dmaArbitrate1;/**< Arbitrate after 1 DMA transfer. It can be 2, 4....*/
-  descrCfg.hprot   = 0;
-  DMA_CfgDescr(ADC_DMA_CHANNEL, true, &descrCfg);
-}
 
 
 /***************************************************************************//**
@@ -457,7 +371,7 @@ void adcTImerPrs(void)
 
 uint32_t GetADCvalue_Force(unsigned channel) {
 	//CMU_ClockEnable(cmuClock_ADC0, true);
-uint32_t sample;
+//uint32_t sample;
 //adcReset();
 	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
 	scanInit.reference = adcRefVDD;
@@ -507,7 +421,7 @@ uint32_t GetADCvalue_Force0(void) {
 		return ADC_DataScanGet(ADC0);
 
 }
-/*
+
 
 uint32_t GetADCvalue_Force1(void) {
 
